@@ -86,8 +86,32 @@
         <div class="status-dot" id="firebase-status-dot"></div>
         <span id="firebase-status-text">Connecting...</span>
       </div>
+      <button class="btn btn-sign-out" id="btn-sign-out" type="button" hidden>
+        <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign out
+      </button>
     </div>
   </header>
+
+  <div class="auth-gate" id="auth-gate" hidden>
+    <section class="auth-card" aria-labelledby="auth-heading">
+      <div class="auth-icon"><i class="fa-solid fa-lock"></i></div>
+      <h2 id="auth-heading">Warehouse sign-in</h2>
+      <p>Sign in with the shared warehouse account to access and sync records.</p>
+      <form id="auth-form">
+        <div class="form-group">
+          <label for="auth-email">Warehouse email</label>
+          <input class="form-control" id="auth-email" type="email" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input class="form-control" id="auth-password" type="password" autocomplete="current-password" required>
+        </div>
+        <p class="auth-error" id="auth-error" role="alert" aria-live="polite"></p>
+        <button class="btn btn-primary auth-submit" id="btn-auth-submit" type="submit">Sign in and sync records</button>
+      </form>
+      <p class="auth-note">Only staff with the warehouse account should sign in. Ask the project owner to create or reset the account.</p>
+    </section>
+  </div>
 
   <!-- Main Container -->
   <main class="main-content">
@@ -1034,8 +1058,9 @@
           <li>Copy your <code>firebaseConfig</code> keys and paste them into <code
               style="background: var(--slate-100); padding: 0.1rem 0.3rem; border-radius: 4px;">firebase-config.js</code>
           </li>
+          <li>Enable <strong>Email/Password</strong> in Firebase Authentication and create one warehouse user account.</li>
           <li>In Firebase Console, create a <strong>Cloud Firestore</strong> database and publish rules appropriate
-            for your data.</li>
+            for your data. Allow only the warehouse account's User UID in <code>firestore.rules</code>.</li>
           <li>Save the file and refresh this page. Records will sync in real time!</li>
         </ol>
 

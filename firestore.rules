@@ -5,26 +5,25 @@ service cloud.firestore {
     // ==============================================================================
     // CropVault Security Rules - JNTUA Innovation Conclave Prototype
     // ==============================================================================
-    // In production, integrate Firebase Authentication to restrict writes to verified
-    // warehouse managers (e.g., request.auth != null && request.auth.token.role == 'manager').
-    //
-    // For this prototype demonstration, we allow public read and write access to the
-    // 'crop_deposits' collection while enforcing basic data structure validation.
+    // Only the explicitly allowed warehouse account may access crop records.
     // ==============================================================================
 
-    match /crop_deposits/{depositId} {
-      // Allow reading all crop records (for public lookup and receipt verification)
-      allow read: if true;
+    function isWarehouseUser() {
+      return request.auth != null
+             && request.auth.uid == 'REPLACE_WITH_WAREHOUSE_USER_UID';
+    }
 
-      // Allow creating a crop record if essential fields are provided
-      allow create: if request.resource.data.receiptId is string
+    match /crop_deposits/{depositId} {
+      allow read: if isWarehouseUser();
+
+      allow create: if isWarehouseUser()
+                    && request.resource.data.receiptId is string
                     && request.resource.data.farmerName is string
                     && request.resource.data.cropType is string
                     && request.resource.data.totalWeightKg is number
                     && request.resource.data.totalWeightKg > 0;
 
-      // Allow updating and deleting records for manager demo administration
-      allow update, delete: if true;
+      allow update, delete: if isWarehouseUser();
     }
 
     // Default deny for any other collections

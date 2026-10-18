@@ -28,9 +28,7 @@ export const firebaseConfig = {
  * or if the application should run in demo/offline local storage mode.
  */
 export function isFirebaseConfigured() {
-  return (
-    firebaseConfig.apiKey !== "YOUR_API_KEY" &&
-    firebaseConfig.projectId !== "YOUR_PROJECT_ID" &&
-    firebaseConfig.apiKey.length > 5
+  return Object.values(firebaseConfig).every(
+    value => typeof value === "string" && value.length > 5 && !value.startsWith("YOUR_")
   );
 }

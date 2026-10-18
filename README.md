@@ -103,7 +103,7 @@ Because the application uses modern **ES6 JavaScript Modules** (`import` / `expo
 
 To sync records in the cloud across different devices:
 
-The published GitHub Pages site also requires a configured Firebase project for cross-device sync. The checked-in `firebase-config.js` contains placeholders, so the site currently saves records only in each visitor's browser. After configuring Firebase and Firestore, redeploy the updated `firebase-config.js` to GitHub Pages.
+The published GitHub Pages site also requires a configured Firebase project for cross-device sync. The checked-in `firebase-config.js` contains placeholders, so the site currently saves records only in each visitor's browser. Records saved before cloud setup are not uploaded automatically. After configuring Firebase and Firestore, redeploy the updated `firebase-config.js` to GitHub Pages.
 
 ### 1. Create a Firebase Project
 1. Navigate to [Firebase Console](https://console.firebase.google.com/) and sign in with your Google account.
@@ -125,8 +125,8 @@ The published GitHub Pages site also requires a configured Firebase project for 
    };
    ```
 
-### 3. Paste Credentials into `firebase-config.js`
-Open `firebase-config.js` in VS Code and paste the copied values into `firebaseConfig`:
+### 3. Configure the Firebase Web App
+Open `firebase-config.js` and replace the placeholders with the Web App values:
 ```javascript
 export const firebaseConfig = {
   apiKey: "AIzaSyD-YourActualApiKeyHere",
@@ -145,34 +145,48 @@ export const firebaseConfig = {
 4. Create the database.
 5. Click **Enable**.
 
-### 5. Deploy Security Rules (Optional but Recommended)
-The rules in `firestore.rules` allow public reads and writes for prototype testing. Only use non-sensitive sample data with these rules. Do not store real farmer names, phone numbers, or identity details until access is protected with Firebase Authentication and appropriately restricted Firestore rules.
+### 5. Enable warehouse sign-in
+1. In Firebase Console, open **Build -> Authentication -> Get started**.
+2. Enable the **Email/Password** sign-in provider.
+3. In **Users**, create one warehouse account. The website has sign-in only; do not add public account registration.
+4. In Authentication settings, add `venkatanaveen-code.github.io` to the authorized domains if it is not already listed.
+5. Copy the account's **User UID**; the app does not need the password outside the sign-in form.
+6. Use this same warehouse account to sign in on each authorized device.
 
-In Firebase Console -> Firestore Database -> **Rules** tab, review and publish the rules for your use case:
+### 6. Deploy authenticated Firestore rules
+In `firestore.rules`, replace `REPLACE_WITH_WAREHOUSE_USER_UID` with the User UID from the previous step. In Firebase Console -> Firestore Database -> **Rules**, publish the updated rules. They allow only that manually created account to access records:
 ```text
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isWarehouseUser() {
+      return request.auth != null
+             && request.auth.uid == 'REPLACE_WITH_WAREHOUSE_USER_UID';
+    }
     match /crop_deposits/{depositId} {
-      allow read: if true;
-      allow create: if request.resource.data.receiptId is string
+      allow read: if isWarehouseUser();
+      allow create: if isWarehouseUser()
+                    && request.resource.data.receiptId is string
                     && request.resource.data.totalWeightKg > 0;
-      allow update, delete: if true;
+      allow update, delete: if isWarehouseUser();
+    }
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
 ```
 Click **Publish**.
 
-### 6. Verify Connection
-Refresh your browser. The top-right badge will turn green and display:
-**`● Firestore Live`**.
+### 7. Publish the Firebase configuration
+The Firebase Web App config is public client configuration; never add Admin SDK credentials or service-account keys. Commit and push the updated `firebase-config.js` to the `pages` branch so GitHub Pages can load it. Open the public site, sign in, and confirm the header shows **Cloud sync**. The same signed-in warehouse account can access the shared records from other devices.
 
 ---
 
 ## 🔒 Security Best Practice
-- **Client-Side API Keys:** The `apiKey` in `firebase-config.js` is a public client identifier used to identify your project to Google APIs.
-- **No Private Keys:** As strictly required, **NO** Firebase Admin credentials, private keys, or service account JSON secrets are included in the frontend code. All authorization is governed by Cloud Firestore security rules.
+- **Client-Side API Keys:** The `apiKey` in `firebase-config.js` is public client configuration, not an authorization secret. Restrict it to the required APIs in Google Cloud.
+- **No Private Keys:** Never put Firebase Admin credentials, private keys, or service-account JSON in this frontend repository.
+- **Farmer data:** Firestore access is limited to signed-in accounts. Protect the shared warehouse password and use it only on authorized devices.
 
 ---
 

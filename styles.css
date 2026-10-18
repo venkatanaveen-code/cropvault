@@ -208,6 +208,91 @@ body {
   background: rgba(0, 0, 0, 0.35);
 }
 
+.btn-sign-out {
+  min-height: 40px;
+  padding: 0.35rem 0.7rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--white);
+  white-space: nowrap;
+}
+
+.btn-sign-out:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.btn-sign-out[hidden],
+.auth-gate[hidden] {
+  display: none;
+}
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.auth-card {
+  width: min(100%, 420px);
+  padding: 1.75rem;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-xl);
+}
+
+.auth-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--primary-50);
+  color: var(--primary-700);
+  font-size: 1.2rem;
+}
+
+.auth-card h2 {
+  margin-bottom: 0.3rem;
+  color: var(--slate-900);
+  font-size: 1.35rem;
+}
+
+.auth-card > p {
+  margin-bottom: 1.25rem;
+  color: var(--slate-600);
+  font-size: 0.9rem;
+}
+
+.auth-card .form-group {
+  margin-bottom: 0.9rem;
+}
+
+.auth-card .form-control {
+  min-height: 44px;
+}
+
+.auth-error {
+  color: var(--danger-600) !important;
+  font-size: 0.82rem !important;
+}
+
+.auth-submit {
+  width: 100%;
+  min-height: 46px;
+}
+
+.auth-card .auth-note {
+  margin: 1rem 0 0;
+  font-size: 0.78rem;
+}
+
 .status-dot {
   width: 8px;
   height: 8px;

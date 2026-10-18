@@ -22,6 +22,8 @@ const COMMODITY_RATES = {
 const state = {
   records: [],
   db: null,
+  auth: null,
+  unsubscribeRecords: null,
   isFirebaseActive: false,
   currentReceipt: null,
   qrInstance: null,
@@ -98,6 +100,10 @@ export function generateSampleCropSvg(cropType) {
 // Dynamic Firebase module registry (Loaded on-demand only if configured)
 const fb = {
   initializeApp: null,
+  getAuth: null,
+  onAuthStateChanged: null,
+  signInWithEmailAndPassword: null,
+  signOut: null,
   getFirestore: null,
   collection: null,
   addDoc: null,
@@ -113,8 +119,13 @@ async function loadFirebaseModules() {
   if (fb.initializeApp) return true;
   try {
     const appModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    const authModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
     const firestoreModule = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
     fb.initializeApp = appModule.initializeApp;
+    fb.getAuth = authModule.getAuth;
+    fb.onAuthStateChanged = authModule.onAuthStateChanged;
+    fb.signInWithEmailAndPassword = authModule.signInWithEmailAndPassword;
+    fb.signOut = authModule.signOut;
     fb.getFirestore = firestoreModule.getFirestore;
     fb.collection = firestoreModule.collection;
     fb.addDoc = firestoreModule.addDoc;
@@ -126,7 +137,7 @@ async function loadFirebaseModules() {
     fb.deleteDoc = firestoreModule.deleteDoc;
     return true;
   } catch (err) {
-    console.warn("Could not load Firebase modules from CDN. Operating in local mode:", err);
+    console.error("Could not load Firebase modules from CDN:", err);
     return false;
   }
 }
@@ -141,6 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initPhotoUploader();
   initLoanCalculator();
   initReceiptModal();
+  initAuthForm();
   initFirebaseOrLocal();
   setupEventHandlers();
 });
@@ -221,38 +233,65 @@ async function initFirebaseOrLocal() {
   const statusDot = document.getElementById("firebase-status-dot");
   const statusText = document.getElementById("firebase-status-text");
 
-  // Load from local storage cache first for instant rendering
-  loadLocalRecords();
-  renderDashboard();
-  renderRecordsTable();
-  populateLoanReceiptDropdown();
-  renderLookupQuickChips();
-
-  if (isFirebaseConfigured()) {
-    const loaded = await loadFirebaseModules();
-    if (loaded) {
-      try {
-        const app = fb.initializeApp(firebaseConfig);
-        state.db = fb.getFirestore(app);
-        state.isFirebaseActive = true;
-
-        statusDot.classList.remove("offline");
-        statusText.textContent = "Firestore Live";
-        statusPill.hidden = false;
-        statusPill.title = "Connected to Google Cloud Firestore database";
-        showToast("Connected to Firebase Firestore cloud database", "success");
-
-        // Subscribe to real-time updates from 'crop_deposits' collection
-        subscribeToFirestore();
-        return;
-      } catch (err) {
-        console.warn("Firebase initialization failed, falling back to local demo mode:", err);
-      }
-    }
+  if (!isFirebaseConfigured()) {
+    loadLocalRecords();
+    renderDashboard();
+    renderRecordsTable();
+    populateLoanReceiptDropdown();
+    renderLookupQuickChips();
+    activateLocalStorageMode(statusDot, statusText, statusPill);
+    return;
   }
 
-  // Fallback to Demo Mode
-  activateLocalStorageMode(statusDot, statusText, statusPill);
+  statusPill.hidden = false;
+  statusText.textContent = "Connecting";
+  statusPill.title = "Connecting to the shared warehouse database.";
+
+  if (!await loadFirebaseModules()) {
+    setFirebaseStatus(statusDot, statusText, "Cloud unavailable");
+    showAuthGate("Could not load Firebase. Check your internet connection and reload the page.");
+    return;
+  }
+
+  try {
+    const app = fb.initializeApp(firebaseConfig);
+    state.auth = fb.getAuth(app);
+    state.db = fb.getFirestore(app);
+    fb.onAuthStateChanged(state.auth, (user) => {
+      if (!user) {
+        state.isFirebaseActive = false;
+        if (state.unsubscribeRecords) {
+          state.unsubscribeRecords();
+          state.unsubscribeRecords = null;
+        }
+        state.records = [];
+        renderDashboard();
+        renderRecordsTable();
+        populateLoanReceiptDropdown();
+        renderLookupQuickChips();
+        setFirebaseStatus(statusDot, statusText, "Sign in");
+        statusPill.title = "Sign in with the warehouse account to access shared records.";
+        showAuthGate();
+        return;
+      }
+
+      state.isFirebaseActive = true;
+      statusDot.classList.remove("offline");
+      statusText.textContent = "Cloud sync";
+      statusPill.title = `Signed in as ${user.email || "warehouse account"}`;
+      document.getElementById("btn-sign-out").hidden = false;
+      hideAuthGate();
+      subscribeToFirestore();
+    }, (error) => {
+      console.error("Firebase authentication state error:", error);
+      setFirebaseStatus(statusDot, statusText, "Cloud error");
+      showAuthGate("Could not verify the warehouse account: " + error.message);
+    });
+  } catch (err) {
+    console.error("Firebase initialization failed:", err);
+    setFirebaseStatus(statusDot, statusText, "Cloud error");
+    showAuthGate("Could not connect to Firebase: " + err.message);
+  }
 }
 
 function activateLocalStorageMode(dot, text, pill) {
@@ -270,6 +309,70 @@ function activateLocalStorageMode(dot, text, pill) {
   }
 }
 
+function setFirebaseStatus(dot, text, label) {
+  if (dot) dot.classList.add("offline");
+  if (text) text.textContent = label;
+}
+
+function showAuthGate(message = "") {
+  const gate = document.getElementById("auth-gate");
+  const error = document.getElementById("auth-error");
+  if (error) error.textContent = message;
+  if (gate) gate.hidden = false;
+  document.getElementById("btn-sign-out").hidden = true;
+}
+
+function hideAuthGate() {
+  const gate = document.getElementById("auth-gate");
+  if (gate) gate.hidden = true;
+  const error = document.getElementById("auth-error");
+  if (error) error.textContent = "";
+}
+
+function initAuthForm() {
+  const form = document.getElementById("auth-form");
+  const submitButton = document.getElementById("btn-auth-submit");
+  const signOutButton = document.getElementById("btn-sign-out");
+
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const email = document.getElementById("auth-email").value.trim();
+      const password = document.getElementById("auth-password").value;
+      const error = document.getElementById("auth-error");
+      if (error) error.textContent = "";
+
+      if (!state.auth || !fb.signInWithEmailAndPassword) {
+        showAuthGate("Firebase is not ready. Check the project configuration and reload.");
+        return;
+      }
+
+      submitButton.disabled = true;
+      try {
+        await fb.signInWithEmailAndPassword(state.auth, email, password);
+        form.reset();
+      } catch (err) {
+        console.error("Warehouse sign-in failed:", err);
+        if (error) error.textContent = "Sign-in failed. Check the email and password, then try again.";
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  }
+
+  if (signOutButton) {
+    signOutButton.addEventListener("click", async () => {
+      if (!state.auth || !fb.signOut) return;
+      try {
+        await fb.signOut(state.auth);
+      } catch (err) {
+        console.error("Warehouse sign-out failed:", err);
+        showToast("Could not sign out: " + err.message, "error");
+      }
+    });
+  }
+}
+
 /**
  * Real-time listener for Firestore collection
  */
@@ -280,7 +383,7 @@ function subscribeToFirestore() {
     const colRef = fb.collection(state.db, "crop_deposits");
     const q = fb.query(colRef, fb.orderBy("createdAt", "desc"));
 
-    fb.onSnapshot(q, (snapshot) => {
+    state.unsubscribeRecords = fb.onSnapshot(q, (snapshot) => {
       const firestoreRecords = [];
       snapshot.forEach((docSnap) => {
         firestoreRecords.push({
@@ -328,6 +431,8 @@ function loadLocalRecords() {
  * Saves records to LocalStorage
  */
 function saveLocalRecords() {
+  if (isFirebaseConfigured()) return;
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.records));
   } catch (e) {
@@ -803,7 +908,10 @@ async function handleFormSubmit(e) {
   if (submitIcon) submitIcon.style.display = "none";
 
   try {
-    if (state.isFirebaseActive && state.db && fb.addDoc && fb.collection) {
+    if (isFirebaseConfigured()) {
+      if (!state.isFirebaseActive || !state.db || !fb.addDoc || !fb.collection) {
+        throw new Error("Sign in to the shared warehouse account before saving records.");
+      }
       // Save directly to Firestore collection
       const docRef = await fb.addDoc(fb.collection(state.db, "crop_deposits"), newRecord);
       newRecord.id = docRef.id;
@@ -900,13 +1008,13 @@ function openConfigModal() {
   const alertBox = document.getElementById("config-status-alert");
 
   if (isFirebaseConfigured()) {
-    alertBox.style.background = "#ecfdf5";
-    alertBox.style.borderColor = "#a7f3d0";
-    alertBox.style.color = "#065f46";
+    alertBox.style.background = "#e0f2fe";
+    alertBox.style.borderColor = "#bae6fd";
+    alertBox.style.color = "#075985";
     alertBox.innerHTML = `
-      <i class="fa-solid fa-circle-check"></i> <strong>Firebase credentials detected:</strong><br>
-      Connected Project ID: <code>${firebaseConfig.projectId}</code><br>
-      Real-time cloud database synchronization is active.
+      <i class="fa-solid fa-circle-info"></i> <strong>Firebase project configured:</strong><br>
+      Project ID: <code>${firebaseConfig.projectId}</code><br>
+      Sign in with the warehouse account to access shared records.
     `;
   } else {
     alertBox.style.background = "#fef3c7";
