@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CropVault – Cold Storage & Emergency Loan Linker</title>
+  <meta name="description"
+    content="Agricultural cold storage intake, digital QR receipts, and emergency warehouse loan linking.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Standalone QR Code Generator Library (Zero Dependencies, Offline Compatible) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Local Protocol Safety Check -->
+  <script>
+    if (window.location.protocol === 'file:') {
+      document.addEventListener("DOMContentLoaded", function () {
+        var b = document.createElement("div");
+        b.style.cssText = "position:fixed;top:0;left:0;right:0;background:#b91c1c;color:#ffffff;padding:12px 20px;text-align:center;font-family:sans-serif;font-size:14px;z-index:999999;box-shadow:0 4px 12px rgba(0,0,0,0.25);";
+        b.innerHTML = "<strong>⚠️ Notice:</strong> Opened via <code>file://</code>. Web apps with modules must be run on a local HTTP server. <a href='http://127.0.0.1:8000' style='color:#fef08a;text-decoration:underline;margin-left:8px;font-weight:bold;'>Click here to open via http://127.0.0.1:8000</a> (or use VS Code Live Server).";
+        document.body.prepend(b);
+      });
+    }
+  </script>
+</head>
+
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand-wrapper">
+        <div class="brand-icon">
+          <i class="fa-solid fa-wheat-awn"></i>
+        </div>
+        <div class="brand-text">
+          <h1>CropVault</h1>
+          <div class="tagline">Cold Storage & Emergency Loan Linker</div>
+        </div>
+      </div>
+
+      <nav>
+        <ul class="nav-links">
+          <li>
+            <button class="nav-item active" data-target="dashboard-view" id="nav-dashboard">
+              <i class="fa-solid fa-chart-pie"></i> Dashboard
+            </button>
+          </li>
+          <li>
+            <button class="nav-item" data-target="deposit-view" id="nav-deposit">
+              <i class="fa-solid fa-circle-plus"></i> New Deposit
+            </button>
+          </li>
+          <li>
+            <button class="nav-item" data-target="records-view" id="nav-records">
+              <i class="fa-solid fa-database"></i> Saved Records
+            </button>
+          </li>
+          <li>
+            <button class="nav-item" data-target="lookup-view" id="nav-lookup">
+              <i class="fa-solid fa-magnifying-glass"></i> Receipt Lookup
+            </button>
+          </li>
+          <li>
+            <button class="nav-item" data-target="loan-view" id="nav-loan">
+              <i class="fa-solid fa-hand-holding-dollar"></i> Loan Linker
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="status-badge" id="firebase-status-pill" title="Click to view connection info" hidden>
+        <div class="status-dot" id="firebase-status-dot"></div>
+        <span id="firebase-status-text">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+
+    <!-- ========================================================================
+         VIEW 1: DASHBOARD
+         ======================================================================== -->
+    <section id="dashboard-view" class="view-section active">
+      <div class="section-header">
+        <div>
+          <div class="section-header-title">
+            <h2>Warehouse Operations Dashboard</h2>
+          </div>
+          <p class="section-subtitle">Real-time cold storage metrics, lot entries, and pledged warehouse receipts.</p>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-seed-sample-data">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Load Sample Records
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-quick-new-deposit">
+            <i class="fa-solid fa-plus"></i> Record Intake
+          </button>
+        </div>
+      </div>
+
+      <!-- Stat Cards Grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-info">
+            <div class="stat-label">Total Deposits</div>
+            <div class="stat-value" id="stat-total-deposits">0</div>
+            <div class="stat-sub"><i class="fa-solid fa-arrow-trend-up"></i> Active Warehouse Lots</div>
+          </div>
+          <div class="stat-icon">
+            <i class="fa-solid fa-receipt"></i>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-info">
+            <div class="stat-label">Stored Weight</div>
+            <div class="stat-value" id="stat-total-weight">0 <span style="font-size: 1rem; font-weight: 500;">kg</span>
+            </div>
+            <div class="stat-sub" id="stat-weight-quintals"><i class="fa-solid fa-boxes-stacked"></i> 0.00 Quintals
+            </div>
+          </div>
+          <div class="stat-icon">
+            <i class="fa-solid fa-scale-balanced"></i>
+          </div>
+        </div>
+
+        <div class="stat-card blue">
+          <div class="stat-info">
+            <div class="stat-label">Farmers Assisted</div>
+            <div class="stat-value" id="stat-total-farmers">0</div>
+            <div class="stat-sub"><i class="fa-solid fa-users"></i> Registered Producers</div>
+          </div>
+          <div class="stat-icon">
+            <i class="fa-solid fa-id-card-clip"></i>
+          </div>
+        </div>
+
+        <div class="stat-card amber">
+          <div class="stat-info">
+            <div class="stat-label">Est. Collateral Value</div>
+            <div class="stat-value" id="stat-collateral-val">₹0</div>
+            <div class="stat-sub"><i class="fa-solid fa-shield-halved"></i> 75% Max Loan Potential</div>
+          </div>
+          <div class="stat-icon">
+            <i class="fa-solid fa-sack-dollar"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard 2-Column Split -->
+      <div class="dashboard-layout">
+        <!-- Left: Recent Crop Deposits Stream -->
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Crop Records</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-view-all-records">
+              View All Records <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+          <div id="recent-deposits-container">
+            <!-- Dynamically populated or empty state -->
+          </div>
+        </div>
+
+        <!-- Right: Facility & Commodity Breakdown -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-temperature-arrow-down"></i> Chamber Allocation</h3>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.9rem;">
+              <div>
+                <div
+                  style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem;">
+                  <span>Chamber A (Chillies / Spices: 2°C)</span>
+                  <span id="chamber-a-stat">68% Capacity</span>
+                </div>
+                <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                  <div style="width: 68%; height: 100%; background: #059669; border-radius: 4px;"></div>
+                </div>
+              </div>
+              <div>
+                <div
+                  style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem;">
+                  <span>Chamber B (Paddy & Food Grains: 14°C)</span>
+                  <span id="chamber-b-stat">45% Capacity</span>
+                </div>
+                <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                  <div style="width: 45%; height: 100%; background: #0284c7; border-radius: 4px;"></div>
+                </div>
+              </div>
+              <div>
+                <div
+                  style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem;">
+                  <span>Chamber C (Onions & Bulbs: CA 0°C)</span>
+                  <span id="chamber-c-stat">30% Capacity</span>
+                </div>
+                <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                  <div style="width: 30%; height: 100%; background: #d97706; border-radius: 4px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card"
+            style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border-color: #a7f3d0;">
+            <div class="card-header" style="border-bottom-color: #d1fae5;">
+              <h3 style="color: #065f46;"><i class="fa-solid fa-lightbulb"></i> Conclave Feature Highlight</h3>
+            </div>
+            <p style="font-size: 0.82rem; color: #047857; line-height: 1.45;">
+              <strong>Distress Sale Mitigation:</strong> Smallholder farmers often sell post-harvest at rock-bottom
+              prices.
+              CropVault allows cold-storing produce and linking verified e-receipts to emergency low-interest bank
+              credit.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         VIEW 2: CROP DEPOSIT & QUALITY FORM
+         ======================================================================== -->
+    <section id="deposit-view" class="view-section">
+      <div class="section-header">
+        <div>
+          <div class="section-header-title">
+            <h2>Record Crop Intake & Quality Assessment</h2>
+          </div>
+          <p class="section-subtitle">Warehouse Manager portal for weighing, grading, and generating digital QR
+            receipts.</p>
+        </div>
+        <div class="section-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-fill-sample-form">
+            <i class="fa-solid fa-feather"></i> Fill Rayalaseema Sample Record
+          </button>
+        </div>
+      </div>
+
+      <form id="crop-deposit-form">
+        <div class="form-grid-layout">
+          <!-- Left Column: Farmer & Deposit Details -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-tractor"></i> 1. Farmer & Deposit Details</h3>
+              <span class="badge badge-grade-a">Part A</span>
+            </div>
+
+            <!-- Farmer Name -->
+            <div class="form-group">
+              <label for="farmer-name">Farmer Full Name <span class="required">*</span></label>
+              <input type="text" id="farmer-name" class="form-control" placeholder="e.g. K. Venkata Ramana Reddy"
+                required>
+              <div class="invalid-feedback">Please enter the farmer's name.</div>
+            </div>
+
+            <!-- Phone & Aadhaar ID -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="farmer-phone">Phone Number (Optional)</label>
+                <input type="tel" id="farmer-phone" class="form-control" placeholder="e.g. 9848022334" maxlength="10">
+                <div class="invalid-feedback">Enter a valid 10-digit mobile number.</div>
+              </div>
+              <div class="form-group">
+                <label for="farmer-aadhaar">Farmer ID / Aadhaar Last 4</label>
+                <input type="text" id="farmer-aadhaar" class="form-control" placeholder="e.g. 7842" maxlength="4">
+              </div>
+            </div>
+
+            <!-- Crop Type & Variety -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="crop-type">Crop Commodity <span class="required">*</span></label>
+                <select id="crop-type" class="form-control" required>
+                  <option value="">-- Select Commodity --</option>
+                  <option value="Red Chilli">Red Chilli (Mirchi)</option>
+                  <option value="Paddy (Rice)">Paddy (Rice)</option>
+                  <option value="Groundnut">Groundnut (Peanut)</option>
+                  <option value="Turmeric">Turmeric (Haldi)</option>
+                  <option value="Bengal Gram">Bengal Gram (Chana)</option>
+                  <option value="Maize">Maize (Corn)</option>
+                  <option value="Onion">Onion</option>
+                  <option value="Cotton">Cotton</option>
+                </select>
+                <div class="invalid-feedback">Please select a crop commodity.</div>
+              </div>
+              <div class="form-group">
+                <label for="crop-variety">Variety / Hybrid</label>
+                <input type="text" id="crop-variety" class="form-control" placeholder="e.g. Teja / BPT 5204 / Desi">
+              </div>
+            </div>
+
+            <!-- Bags & Total Weight in KG -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="bag-count">Number of Bags <span class="required">*</span></label>
+                <input type="number" id="bag-count" class="form-control" placeholder="e.g. 50" min="1" required>
+                <div class="invalid-feedback">Enter number of bags (min 1).</div>
+              </div>
+              <div class="form-group">
+                <label for="total-weight-kg">Total Weight (Kg) <span class="required">*</span></label>
+                <input type="number" id="total-weight-kg" class="form-control" placeholder="e.g. 2500" min="1"
+                  step="0.5" required>
+                <div class="invalid-feedback">Enter valid weight in kilograms.</div>
+                <div class="input-hint-pill" id="quintals-preview-pill">
+                  <i class="fa-solid fa-calculator"></i> = 0.00 Quintals (0.00 MT)
+                </div>
+              </div>
+            </div>
+
+            <!-- Warehouse Facility & Location -->
+            <div class="form-group">
+              <label for="warehouse-name">Cold Storage Facility & Location <span class="required">*</span></label>
+              <select id="warehouse-name" class="form-control" required>
+                <option value="AP State Warehousing Corp - Anantapur Hub">AP State Warehousing Corp - Anantapur Hub
+                </option>
+                <option value="Rayalaseema Agri Cold Logistics - Tadipatri">Rayalaseema Agri Cold Logistics - Tadipatri
+                </option>
+                <option value="Kurnool Spices & Cold Storage Unit-2">Kurnool Spices & Cold Storage Unit-2</option>
+                <option value="Kadapa Regional Commodity Vault">Kadapa Regional Commodity Vault</option>
+                <option value="JNTUA Agri-Tech Innovation Cold Hub">JNTUA Agri-Tech Innovation Cold Hub</option>
+              </select>
+              <div class="invalid-feedback">Please specify the warehouse facility.</div>
+            </div>
+
+            <!-- Storage Chamber & Date -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="deposit-date">Deposit Date <span class="required">*</span></label>
+                <input type="date" id="deposit-date" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label for="storage-condition">Storage Condition <span class="required">*</span></label>
+                <select id="storage-condition" class="form-control" required>
+                  <option value="Refrigerated Cold Chamber (2-4°C)">Refrigerated Cold Chamber (2-4°C)</option>
+                  <option value="Controlled Atmosphere (CA - 0°C)">Controlled Atmosphere (CA - 0°C)</option>
+                  <option value="Deep Freeze Chamber (-18°C)">Deep Freeze Chamber (-18°C)</option>
+                  <option value="Ventilated Dry Ambient">Ventilated Dry Ambient</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Crop Quality Inspection Form -->
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-flask-vial"></i> 2. Quality & Inspection Analysis</h3>
+              <span class="badge badge-grade-a">Part B</span>
+            </div>
+
+            <!-- Moisture Percentage -->
+            <div class="metric-box">
+              <div class="metric-header">
+                <span class="metric-title"><i class="fa-solid fa-droplet"></i> Moisture Content (%)</span>
+                <span class="metric-value-badge" id="moisture-badge">10.5%</span>
+              </div>
+              <input type="number" id="moisture-pct" class="form-control" value="10.5" min="0" max="100" step="0.1"
+                required>
+              <div class="metric-hint">Standard safe storage threshold for grains & spices is typically &lt; 12.0%.
+              </div>
+            </div>
+
+            <!-- Foreign Matter Percentage -->
+            <div class="metric-box">
+              <div class="metric-header">
+                <span class="metric-title"><i class="fa-solid fa-filter"></i> Foreign Matter (%)</span>
+                <span class="metric-value-badge" id="foreign-badge">0.8%</span>
+              </div>
+              <input type="number" id="foreign-matter-pct" class="form-control" value="0.8" min="0" max="50" step="0.1"
+                required>
+              <div class="metric-hint">Stones, dust, chaff or weed seeds. Permitted Fair Average Quality is &lt; 1.5%.
+              </div>
+            </div>
+
+            <!-- Damaged Produce Percentage -->
+            <div class="metric-box">
+              <div class="metric-header">
+                <span class="metric-title"><i class="fa-solid fa-circle-exclamation"></i> Damaged / Discolored
+                  (%)</span>
+                <span class="metric-value-badge" id="damaged-badge">1.2%</span>
+              </div>
+              <input type="number" id="damaged-produce-pct" class="form-control" value="1.2" min="0" max="100"
+                step="0.1" required>
+              <div class="metric-hint">Discolored, shriveled, or insect-bored kernels.</div>
+            </div>
+
+            <!-- Quality Grade Selection -->
+            <div class="form-group" style="margin-top: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label>Assigned Quality Grade <span class="required">*</span></label>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-auto-grade"
+                  style="font-size: 0.72rem; padding: 0.15rem 0.5rem;">
+                  <i class="fa-solid fa-wand-magic"></i> Auto-Suggest Grade
+                </button>
+              </div>
+
+              <div class="grade-selector-group">
+                <label class="grade-option">
+                  <input type="radio" name="quality-grade" value="Grade A+" checked>
+                  <div class="grade-card">
+                    <span class="grade-name">A+</span>
+                    <span class="grade-sub">Export / Premium</span>
+                  </div>
+                </label>
+                <label class="grade-option">
+                  <input type="radio" name="quality-grade" value="Grade A">
+                  <div class="grade-card">
+                    <span class="grade-name">A</span>
+                    <span class="grade-sub">Standard FAQ</span>
+                  </div>
+                </label>
+                <label class="grade-option">
+                  <input type="radio" name="quality-grade" value="Grade B">
+                  <div class="grade-card">
+                    <span class="grade-name">B</span>
+                    <span class="grade-sub">Commercial</span>
+                  </div>
+                </label>
+                <label class="grade-option">
+                  <input type="radio" name="quality-grade" value="Grade C">
+                  <div class="grade-card">
+                    <span class="grade-name">C</span>
+                    <span class="grade-sub">Industrial Feed</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Inspector Details & Notes -->
+            <div class="form-row" style="margin-top: 1rem;">
+              <div class="form-group">
+                <label for="inspector-name">Warehouse Inspector / Manager</label>
+                <input type="text" id="inspector-name" class="form-control" value="R. Sundaram (QC Manager)">
+              </div>
+              <div class="form-group">
+                <label for="inspection-date">Inspection Date</label>
+                <input type="date" id="inspection-date" class="form-control">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="inspection-notes">Quality Assessment Notes & Bag Condition</label>
+              <textarea id="inspection-notes" class="form-control" rows="2"
+                placeholder="e.g. Clean sound jute bags, moisture within safe cold storage parameters. Fumigation done."></textarea>
+            </div>
+
+            <!-- Crop Produce Lot Photo / Sample Inspection -->
+            <div class="form-group" style="margin-top: 1rem;">
+              <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.4rem;">
+                <label style="margin-bottom: 0;"><i class="fa-solid fa-camera"></i> Crop Produce Lot Photo (Inspection
+                  Proof)</label>
+                <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-open-camera"
+                    style="font-size: 0.72rem; padding: 0.15rem 0.55rem; background-color: var(--primary-700);">
+                    <i class="fa-solid fa-video"></i> Live Camera
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-trigger-photo"
+                    style="font-size: 0.72rem; padding: 0.15rem 0.5rem;">
+                    <i class="fa-solid fa-upload"></i> Upload File
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-sample-crop-photo"
+                    style="font-size: 0.72rem; padding: 0.15rem 0.5rem;">
+                    <i class="fa-solid fa-image"></i> Sample Photo
+                  </button>
+                </div>
+              </div>
+              <input type="file" id="crop-photo-input" accept="image/*" capture="environment" style="display: none;">
+
+              <div id="photo-dropzone-box" class="photo-dropzone">
+                <div id="photo-placeholder"
+                  style="text-align: center; color: var(--slate-400); padding: 0.85rem 0.5rem;">
+                  <i class="fa-solid fa-camera-retro"
+                    style="font-size: 1.8rem; margin-bottom: 0.3rem; color: var(--primary-600);"></i>
+                  <div style="font-size: 0.78rem; color: var(--slate-600);">Click to upload or capture a photo of the
+                    crop sample/bags</div>
+                  <div style="font-size: 0.68rem; color: var(--slate-400); margin-top: 0.15rem;">Supports JPG, PNG, WEBP
+                    (auto-compressed for e-Receipt)</div>
+                </div>
+                <div id="photo-preview-wrapper" style="display: none; position: relative; text-align: center;">
+                  <img id="photo-preview-img" src="" alt="Crop Lot Preview"
+                    style="max-height: 140px; border-radius: 8px; border: 1.5px solid var(--primary-600); box-shadow: var(--shadow-sm); max-width: 100%;">
+                  <button type="button" id="btn-remove-photo" class="btn btn-danger-outline btn-sm"
+                    style="position: absolute; top: 6px; right: 6px; padding: 0.2rem 0.45rem; font-size: 0.7rem; background: rgba(255,255,255,0.92);">
+                    <i class="fa-solid fa-trash"></i> Remove
+                  </button>
+                  <div id="photo-caption-tag"
+                    style="font-size: 0.72rem; font-weight: 600; color: #047857; margin-top: 0.3rem;">
+                    <i class="fa-solid fa-circle-check"></i> Photo Attached (Verified Lot Evidence)
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit & Reset Bar -->
+        <div class="form-actions-bar">
+          <button type="reset" class="btn btn-secondary" id="btn-reset-form">
+            <i class="fa-solid fa-rotate-left"></i> Clear Form
+          </button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-deposit">
+            <span id="btn-submit-spinner" style="display: none;"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+            <i class="fa-solid fa-qrcode" id="btn-submit-icon"></i> Save Record & Generate Digital Receipt
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ========================================================================
+         VIEW 3: SAVED RECORDS TABLE
+         ======================================================================== -->
+    <section id="records-view" class="view-section">
+      <div class="section-header">
+        <div>
+          <div class="section-header-title">
+            <h2>Saved Cold Storage Records</h2>
+          </div>
+          <p class="section-subtitle">Browse, search, and verify all stored crop deposits synced with Firebase
+            Firestore.</p>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-export-csv">
+            <i class="fa-solid fa-file-csv"></i> Export CSV
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-nav-to-deposit-from-records">
+            <i class="fa-solid fa-plus"></i> Add New Record
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters & Search Toolbar -->
+      <div class="table-toolbar">
+        <div class="search-input-wrapper">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="records-search-input" class="form-control"
+            placeholder="Search by Receipt ID, Farmer name, Crop, or Warehouse...">
+        </div>
+        <select id="records-filter-crop" class="filter-select">
+          <option value="">All Crop Types</option>
+          <option value="Red Chilli">Red Chilli</option>
+          <option value="Paddy (Rice)">Paddy (Rice)</option>
+          <option value="Groundnut">Groundnut</option>
+          <option value="Turmeric">Turmeric</option>
+          <option value="Bengal Gram">Bengal Gram</option>
+          <option value="Onion">Onion</option>
+        </select>
+        <select id="records-filter-grade" class="filter-select">
+          <option value="">All Grades</option>
+          <option value="Grade A+">Grade A+</option>
+          <option value="Grade A">Grade A</option>
+          <option value="Grade B">Grade B</option>
+          <option value="Grade C">Grade C</option>
+        </select>
+      </div>
+
+      <!-- Records Table Container -->
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div class="table-responsive">
+          <table class="records-table">
+            <thead>
+              <tr>
+                <th>Receipt ID</th>
+                <th>Deposit Date</th>
+                <th>Farmer Name</th>
+                <th>Crop & Variety</th>
+                <th>Bags / Weight</th>
+                <th>Quality Grade</th>
+                <th>Warehouse Facility</th>
+                <th>Est. Collateral</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="records-table-body">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+        <div id="records-empty-state" class="empty-state" style="display: none;">
+          <div class="empty-state-icon">
+            <i class="fa-solid fa-inbox"></i>
+          </div>
+          <h4>No Records Found</h4>
+          <p>No crop deposit records match your search or filter criteria.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         VIEW 4: RECEIPT LOOKUP & VERIFICATION
+         ======================================================================== -->
+    <section id="lookup-view" class="view-section">
+      <div class="section-header">
+        <div>
+          <div class="section-header-title">
+            <h2>Digital Receipt Verification & Lookup</h2>
+          </div>
+          <p class="section-subtitle">Scan or query any CropVault receipt ID to inspect cold storage status and
+            laboratory parameters.</p>
+        </div>
+      </div>
+
+      <div class="card" style="max-width: 720px; margin: 0 auto 2rem;">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-barcode"></i> Lookup by Receipt ID</h3>
+        </div>
+        <form id="lookup-form" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <input type="text" id="lookup-receipt-input" class="form-control"
+            style="flex: 1; min-width: 240px; font-family: var(--font-mono); text-transform: uppercase;"
+            placeholder="e.g. CV-2026-AP-8841" required>
+          <button type="submit" class="btn btn-primary" id="btn-lookup-submit">
+            <i class="fa-solid fa-magnifying-glass"></i> Verify & Retrieve
+          </button>
+        </form>
+
+        <div
+          style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.78rem;">
+          <span style="color: var(--slate-500); font-weight: 600;">Quick Fill:</span>
+          <div id="lookup-quick-chips" style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+            <!-- Dynamic quick chips -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Verification Output Container -->
+      <div id="lookup-result-container" style="max-width: 780px; margin: 0 auto; display: none;">
+        <!-- Dynamically rendered verification card -->
+      </div>
+    </section>
+
+    <!-- ========================================================================
+         VIEW 5: EMERGENCY LOAN LINKER (Innovation Conclave Feature)
+         ======================================================================== -->
+    <section id="loan-view" class="view-section">
+      <div class="section-header">
+        <div>
+          <div class="section-header-title">
+            <h2>Emergency Working Capital Loan Linker</h2>
+          </div>
+          <p class="section-subtitle">Simulate pledge financing against cold storage receipts to avert post-harvest
+            distress sales.</p>
+        </div>
+      </div>
+
+      <div class="loan-calculator-grid">
+        <!-- Left: Loan Calculator Card -->
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-calculator"></i> e-Receipt Loan Collateral Calculator</h3>
+          </div>
+
+          <div class="form-group">
+            <label for="loan-select-receipt">Select Stored Crop Deposit</label>
+            <select id="loan-select-receipt" class="form-control">
+              <option value="">-- Choose from saved deposits or calculate custom --</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="loan-crop-select">Commodity Benchmark</label>
+              <select id="loan-crop-select" class="form-control">
+                <option value="Red Chilli" data-price="210">Red Chilli (Benchmark: ₹210/kg)</option>
+                <option value="Paddy (Rice)" data-price="24">Paddy (MSP Benchmark: ₹24/kg)</option>
+                <option value="Groundnut" data-price="68">Groundnut (MSP Benchmark: ₹68/kg)</option>
+                <option value="Turmeric" data-price="130">Turmeric (Benchmark: ₹130/kg)</option>
+                <option value="Bengal Gram" data-price="55">Bengal Gram (MSP Benchmark: ₹55/kg)</option>
+                <option value="Onion" data-price="22">Onion (Market Benchmark: ₹22/kg)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="loan-weight-input">Quantity (Kilograms)</label>
+              <input type="number" id="loan-weight-input" class="form-control" value="2500" min="100">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="loan-ltv-ratio">Loan-to-Value (LTV) Cap</label>
+              <select id="loan-ltv-ratio" class="form-control">
+                <option value="0.75" selected>75% (Standard RBI / NABARD Agri Guideline)</option>
+                <option value="0.70">70% (Conservative)</option>
+                <option value="0.80">80% (Aggressive FPO Partner)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="loan-tenure-months">Storage Loan Tenure</label>
+              <select id="loan-tenure-months" class="form-control">
+                <option value="3">3 Months (Short Term)</option>
+                <option value="6" selected>6 Months (Standard Season)</option>
+                <option value="9">9 Months (Off-Season Sale)</option>
+              </select>
+            </div>
+          </div>
+
+          <div
+            style="background: var(--slate-50); border: 1.5px solid var(--slate-200); border-radius: var(--radius-md); padding: 1.25rem; margin-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem; font-size: 0.88rem;">
+              <span style="color: var(--slate-600);">Estimated Crop Market Value:</span>
+              <strong id="loan-calc-gross-val"
+                style="color: var(--slate-900); font-family: var(--font-mono);">₹5,25,000</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem; font-size: 0.88rem;">
+              <span style="color: var(--slate-600);">Eligible Working Capital Loan:</span>
+              <strong id="loan-calc-sanction-val"
+                style="color: #065f46; font-size: 1.25rem; font-family: var(--font-mono);">₹3,93,750</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem; font-size: 0.82rem;">
+              <span style="color: var(--slate-600);">Subsidized Agri Interest Rate (7% p.a.):</span>
+              <span id="loan-calc-interest-val" style="color: #92400e; font-weight: 600;">₹13,781 total</span>
+            </div>
+            <div
+              style="border-top: 1px dashed var(--slate-300); margin-top: 0.75rem; padding-top: 0.75rem; display: flex; justify-content: space-between; font-size: 0.82rem;">
+              <span style="color: var(--slate-700); font-weight: 600;">Est. Off-Season Price Realization Uplift:</span>
+              <strong id="loan-calc-uplift-val" style="color: #16a34a;">+ ₹1,05,000 (+20%)</strong>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end;">
+            <button class="btn btn-amber" id="btn-simulate-loan-apply">
+              <i class="fa-solid fa-building-columns"></i> Simulate Bank Loan Sanction Slip
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Innovation & Banking Context -->
+        <div>
+          <div class="loan-benefit-card">
+            <h3 style="font-size: 1.05rem; font-weight: 700; color: #064e3b; margin-bottom: 0.4rem;">
+              <i class="fa-solid fa-handshake"></i> How CropVault Empowers Farmers
+            </h3>
+            <p style="font-size: 0.82rem; color: #065f46; line-height: 1.45;">
+              During harvest peaks in Andhra Pradesh, farmgate commodity prices fall drastically due to immediate cash
+              liquidity needs of smallholders.
+            </p>
+            <ul class="loan-benefit-list">
+              <li>
+                <i class="fa-solid fa-circle-check"></i>
+                <span><strong>No Forced Liquidation:</strong> Deposit produce in verified cold chambers; wait for
+                  off-season market recovery.</span>
+              </li>
+              <li>
+                <i class="fa-solid fa-circle-check"></i>
+                <span><strong>75% Instant Liquidity:</strong> Verified digital receipt serves as collateral for credit
+                  from rural banks.</span>
+              </li>
+              <li>
+                <i class="fa-solid fa-circle-check"></i>
+                <span><strong>Tamper-Proof QR Code:</strong> Bankers verify moisture, lot weight, and QC manager
+                  signatures instantly.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fa-solid fa-building-columns"></i> Simulated Banking Partners</h3>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.84rem;">
+              <div
+                style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: var(--slate-50); border-radius: var(--radius-sm);">
+                <span><strong>Andhra Pragathi Grameena Bank (APGB)</strong></span>
+                <span class="badge badge-grade-a">7.0% Concession</span>
+              </div>
+              <div
+                style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: var(--slate-50); border-radius: var(--radius-sm);">
+                <span><strong>NABARD Refinanced PACS</strong></span>
+                <span class="badge badge-grade-a">e-NWR Compliant</span>
+              </div>
+              <div
+                style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; background: var(--slate-50); border-radius: var(--radius-sm);">
+                <span><strong>Canara Bank Agri-Finance</strong></span>
+                <span class="badge badge-grade-a">Fast Approval</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================================================
+       MODAL: OFFICIAL DIGITAL RECEIPT (PRINT & PDF READY)
+       ========================================================================== -->
+  <div class="modal-overlay" id="receipt-modal-container">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-certificate" style="color: #059669;"></i> Digital Warehouse Receipt Voucher</h3>
+        <button class="modal-close-btn" id="btn-close-receipt-modal" title="Close Modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" id="receipt-printable-area">
+        <!-- Clean Printable Receipt Layout -->
+        <div class="receipt-paper">
+          <div class="receipt-header-strip">
+            <div class="receipt-brand-box">
+              <div class="receipt-brand-logo">
+                <i class="fa-solid fa-wheat-awn"></i>
+              </div>
+              <div class="receipt-titles">
+                <h2>CROPVAULT WAREHOUSE RECEIPT</h2>
+                <p>Agricultural Cold Storage Deposit & Commodity Quality Inward Certificate</p>
+              </div>
+            </div>
+            <div class="receipt-meta-box">
+              <div class="receipt-id-number" id="receipt-modal-id">CV-2026-AP-0000</div>
+              <div class="receipt-date-label">Issue Date: <strong id="receipt-modal-date">--</strong></div>
+            </div>
+          </div>
+
+          <!-- 2 Columns: Details Table & QR Code -->
+          <div class="receipt-columns">
+            <div>
+              <table class="receipt-details-table">
+                <tbody>
+                  <tr>
+                    <td class="label-cell">Farmer / Depositor</td>
+                    <td class="val-cell" id="receipt-modal-farmer">--</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Farmer Contact</td>
+                    <td class="val-cell" id="receipt-modal-phone">--</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Commodity & Variety</td>
+                    <td class="val-cell" id="receipt-modal-crop">--</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Lot Quantity / Bags</td>
+                    <td class="val-cell" id="receipt-modal-bags">--</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Net Weight (Kg / Qtl)</td>
+                    <td class="val-cell" id="receipt-modal-weight">--</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Warehouse Facility</td>
+                    <td class="val-cell" id="receipt-modal-warehouse">--</td>
+                  </tr>
+                  <tr>
+                    <td class="label-cell">Storage Condition</td>
+                    <td class="val-cell" id="receipt-modal-condition">--</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- QR Code Box -->
+            <div class="receipt-qr-container">
+              <div class="receipt-qr-box" id="receipt-modal-qrcode">
+                <!-- QR Code dynamically injected here by QRCode.js -->
+              </div>
+              <div class="qr-caption">
+                <i class="fa-solid fa-qrcode"></i> Scan to Verify e-Receipt
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #475569; margin-top: 0.2rem;"
+                id="receipt-qr-hash">
+                ID: CV-2026-AP-0000
+              </div>
+
+              <!-- Verified Crop Sample Photo on Receipt -->
+              <div class="receipt-photo-card" id="receipt-modal-photo-card" style="display: none;">
+                <img id="receipt-modal-photo-img" src="" alt="Verified Crop Lot Sample" class="receipt-photo-img">
+                <div class="receipt-photo-label"><i class="fa-solid fa-camera"></i> Verified Lot Sample</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quality Matrix -->
+          <div class="receipt-quality-matrix">
+            <div class="quality-cell">
+              <div class="q-label">Moisture Content</div>
+              <div class="q-val" id="receipt-modal-moisture">--%</div>
+            </div>
+            <div class="quality-cell">
+              <div class="q-label">Foreign Matter</div>
+              <div class="q-val" id="receipt-modal-foreign">--%</div>
+            </div>
+            <div class="quality-cell">
+              <div class="q-label">Damaged Produce</div>
+              <div class="q-val" id="receipt-modal-damaged">--%</div>
+            </div>
+            <div class="quality-cell">
+              <div class="q-label">Assigned Grade</div>
+              <div class="q-val" id="receipt-modal-grade" style="color: #047857;">Grade A+</div>
+            </div>
+          </div>
+
+          <!-- Emergency Loan Linker Strip -->
+          <div class="loan-linker-strip">
+            <div class="loan-linker-text">
+              <h4><i class="fa-solid fa-shield-halved"></i> Emergency Working Capital Loan Linkage</h4>
+              <p>Eligible for immediate pledge credit up to 75% market valuation under JNTUA Conclave Agri-Linker
+                scheme.</p>
+            </div>
+            <div class="loan-eligible-amount">
+              <div style="font-size: 0.7rem; color: #78350f; font-weight: 600;">MAX LOAN VALUE</div>
+              <div class="loan-amount-badge" id="receipt-modal-loan-amt">₹0</div>
+            </div>
+          </div>
+
+          <!-- QC Notes -->
+          <div style="font-size: 0.78rem; color: #475569; margin-bottom: 0.5rem;">
+            <strong>QC Inspection Remarks:</strong> <span id="receipt-modal-notes">Sound standard packaging. Suitable
+              for long term preservation.</span>
+          </div>
+
+          <!-- Signatures -->
+          <div class="receipt-signatures">
+            <div class="signature-block">
+              <div
+                style="height: 35px; display: flex; align-items: flex-end; justify-content: center; font-family: cursive; color: #1e3a8a; font-size: 0.95rem;">
+                <span id="receipt-sig-farmer">Farmer Depositor</span>
+              </div>
+              <div class="signature-line">Farmer Depositor Signature</div>
+            </div>
+            <div class="signature-block">
+              <div
+                style="height: 35px; display: flex; align-items: flex-end; justify-content: center; font-family: cursive; color: #047857; font-size: 0.95rem;">
+                <span id="receipt-sig-manager">R. Sundaram (QC Mgr)</span>
+              </div>
+              <div class="signature-line">Warehouse Manager & Seal</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-copy-receipt-id">
+          <i class="fa-regular fa-copy"></i> Copy ID
+        </button>
+        <button class="btn btn-primary" id="btn-print-receipt">
+          <i class="fa-solid fa-print"></i> Print & Save as PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: LIVE CAMERA CAPTURE VIEWFINDER
+       ========================================================================== -->
+  <div class="modal-overlay" id="camera-modal-container">
+    <div class="modal-dialog" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-camera" style="color: #059669;"></i> Live Inspection Camera</h3>
+        <button class="modal-close-btn" id="btn-close-camera-modal" title="Close Camera">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 1rem; text-align: center;">
+        <div
+          style="position: relative; border-radius: 8px; overflow: hidden; background: #0f172a; width: 100%; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);">
+          <video id="camera-stream-video" autoplay playsinline muted
+            style="width: 100%; height: 100%; object-fit: cover;"></video>
+          <!-- Alignment Frame Reticle -->
+          <div
+            style="position: absolute; inset: 16px; border: 2px dashed rgba(16, 185, 129, 0.85); border-radius: 6px; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 8px;">
+            <div
+              style="display: flex; justify-content: space-between; color: #34d399; font-size: 0.68rem; font-family: var(--font-mono); font-weight: 700; background: rgba(0,0,0,0.55); padding: 2px 6px; border-radius: 4px; width: fit-content;">
+              <span><i class="fa-solid fa-circle" style="color: #ef4444; font-size: 8px;"></i> LIVE FEED</span>
+            </div>
+            <div style="text-align: center;">
+              <span
+                style="background: rgba(0,0,0,0.65); color: #ecfdf5; font-size: 0.72rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600;">
+                Align Crop Produce / Grain Sample in Frame
+              </span>
+            </div>
+            <div
+              style="text-align: right; color: rgba(255,255,255,0.7); font-size: 0.65rem; font-family: var(--font-mono);">
+              CROPVAULT QC
+            </div>
+          </div>
+        </div>
+        <div id="camera-status-msg" style="margin-top: 0.6rem; font-size: 0.76rem; color: var(--slate-500);">
+          Point camera at the produce sample or gunny bag lot to capture visual QC record.
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-switch-camera">
+          <i class="fa-solid fa-camera-rotate"></i> Switch Camera
+        </button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-camera">Cancel</button>
+          <button type="button" class="btn btn-primary" id="btn-capture-snapshot">
+            <i class="fa-solid fa-camera"></i> Snap Photo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: FIREBASE CONFIGURATION INFO MODAL
+       ========================================================================== -->
+  <div class="modal-overlay" id="config-modal-container">
+    <div class="modal-dialog" style="max-width: 620px;">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-fire" style="color: #ea580c;"></i> Firebase Connection Status</h3>
+        <button class="modal-close-btn" id="btn-close-config-modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="font-size: 0.88rem; line-height: 1.5;">
+        <div id="config-status-alert"
+          style="padding: 0.85rem; border-radius: var(--radius-md); margin-bottom: 1rem; background: #fef3c7; border: 1px solid #fde68a; color: #92400e;">
+          <!-- Dynamically populated -->
+        </div>
+
+        <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: var(--slate-900);">How to link your Cloud Firestore:
+        </h4>
+        <ol style="padding-left: 1.25rem; color: var(--slate-700); margin-bottom: 1rem;">
+          <li>Open your Firebase Console: <a href="https://console.firebase.google.com/" target="_blank"
+              style="color: var(--primary-700); font-weight: 600;">console.firebase.google.com</a></li>
+          <li>Create a project & add a Web App (<code>&lt;/&gt;</code>)</li>
+          <li>Copy your <code>firebaseConfig</code> keys and paste them into <code
+              style="background: var(--slate-100); padding: 0.1rem 0.3rem; border-radius: 4px;">firebase-config.js</code>
+          </li>
+          <li>In Firebase Console, go to <strong>Firestore Database</strong> -> Create Database in <strong>Test
+              Mode</strong></li>
+          <li>Save the file and refresh this page. Records will sync in real time!</li>
+        </ol>
+
+        <div
+          style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 6px; padding: 0.75rem; font-size: 0.8rem; color: var(--slate-600);">
+          <i class="fa-solid fa-shield-check"></i> <strong>Safe Architecture:</strong> CropVault uses client-side
+          Firebase SDK. No Admin SDK or private keys are ever stored in client code.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" id="btn-dismiss-config-modal">Understood</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <strong>CropVault</strong> — Agricultural Cold Storage & Emergency Loan Linker
+        <div style="font-size: 0.75rem; color: var(--slate-400); margin-top: 0.25rem;">
+          Developed for JNTUA Innovation Conclave Prototype Showcase. Built with HTML5, CSS3, ES6 JavaScript & Firebase
+          Firestore.
+        </div>
+      </div>
+      <div class="footer-links">
+        <a href="#dashboard-view" class="footer-nav-link" data-target="dashboard-view">Dashboard</a>
+        <a href="#deposit-view" class="footer-nav-link" data-target="deposit-view">New Deposit</a>
+        <a href="#records-view" class="footer-nav-link" data-target="records-view">Saved Records</a>
+        <a href="#lookup-view" class="footer-nav-link" data-target="lookup-view">Receipt Lookup</a>
+        <a href="#loan-view" class="footer-nav-link" data-target="loan-view">Loan Linker</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Entry Point (Modular ES6 JavaScript) -->
+  <script type="module" src="app.js"></script>
+</body>
+
+</html>
