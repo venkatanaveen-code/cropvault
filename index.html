@@ -1034,15 +1034,15 @@
           <li>Copy your <code>firebaseConfig</code> keys and paste them into <code
               style="background: var(--slate-100); padding: 0.1rem 0.3rem; border-radius: 4px;">firebase-config.js</code>
           </li>
-          <li>In Firebase Console, go to <strong>Firestore Database</strong> -> Create Database in <strong>Test
-              Mode</strong></li>
+          <li>In Firebase Console, create a <strong>Cloud Firestore</strong> database and publish rules appropriate
+            for your data.</li>
           <li>Save the file and refresh this page. Records will sync in real time!</li>
         </ol>
 
         <div
           style="background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 6px; padding: 0.75rem; font-size: 0.8rem; color: var(--slate-600);">
-          <i class="fa-solid fa-shield-check"></i> <strong>Safe Architecture:</strong> CropVault uses client-side
-          Firebase SDK. No Admin SDK or private keys are ever stored in client code.
+          <i class="fa-solid fa-shield-check"></i> <strong>Security:</strong> Firebase web configuration is public;
+          Firestore rules control access. Do not store personal farmer data until access is properly restricted.
         </div>
       </div>
       <div class="modal-footer">

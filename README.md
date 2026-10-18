@@ -95,14 +95,15 @@ Because the application uses modern **ES6 JavaScript Modules** (`import` / `expo
 3. Right-click anywhere in `index.html` and choose **"Open with Live Server"** (or click **"Go Live"** in the bottom status bar).
 4. Your browser will automatically open at `http://127.0.0.1:5500/index.html`.
 
-> **Note on Instant Demo Mode:**
-> CropVault includes an intelligent fallback mechanism. Even before configuring Firebase, the app runs smoothly using browser `localStorage` with preloaded Rayalaseema agricultural sample data!
+> **Local storage:** Until Firebase is configured, records are stored only in the current browser and are not available on other devices. Sample records are provided for trying the interface.
 
 ---
 
 ## ☁️ Step 3: Configuring Google Firebase Firestore
 
 To sync records in the cloud across different devices:
+
+The published GitHub Pages site also requires a configured Firebase project for cross-device sync. The checked-in `firebase-config.js` contains placeholders, so the site currently saves records only in each visitor's browser. After configuring Firebase and Firestore, redeploy the updated `firebase-config.js` to GitHub Pages.
 
 ### 1. Create a Firebase Project
 1. Navigate to [Firebase Console](https://console.firebase.google.com/) and sign in with your Google account.
@@ -137,15 +138,17 @@ export const firebaseConfig = {
 };
 ```
 
-### 4. Enable Cloud Firestore in Test Mode
+### 4. Enable Cloud Firestore
 1. In the Firebase Console left menu, click **Build -> Firestore Database**.
 2. Click **Create Database**.
 3. Choose a location (e.g., `asia-south1` [Mumbai] for low latency in India).
-4. Select **Start in Test Mode** (this allows reads and writes for the prototype demonstration).
+4. Create the database.
 5. Click **Enable**.
 
 ### 5. Deploy Security Rules (Optional but Recommended)
-In Firebase Console -> Firestore Database -> **Rules** tab, replace the contents with the rules provided in `firestore.rules`:
+The rules in `firestore.rules` allow public reads and writes for prototype testing. Only use non-sensitive sample data with these rules. Do not store real farmer names, phone numbers, or identity details until access is protected with Firebase Authentication and appropriately restricted Firestore rules.
+
+In Firebase Console -> Firestore Database -> **Rules** tab, review and publish the rules for your use case:
 ```text
 rules_version = '2';
 service cloud.firestore {

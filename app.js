@@ -252,13 +252,17 @@ async function initFirebaseOrLocal() {
   }
 
   // Fallback to Demo Mode
-  activateDemoMode(statusDot, statusPill);
+  activateLocalStorageMode(statusDot, statusText, statusPill);
 }
 
-function activateDemoMode(dot, pill) {
+function activateLocalStorageMode(dot, text, pill) {
   state.isFirebaseActive = false;
   if (dot) dot.classList.add("offline");
-  if (pill) pill.hidden = true;
+  if (text) text.textContent = "Local only";
+  if (pill) {
+    pill.hidden = false;
+    pill.title = "Records are stored only in this browser. Configure Firebase to share them across devices.";
+  }
 
   // If no records in local storage either, preload sample data for first run
   if (state.records.length === 0) {
@@ -285,20 +289,23 @@ function subscribeToFirestore() {
         });
       });
 
-      if (firestoreRecords.length > 0) {
-        state.records = firestoreRecords;
-        saveLocalRecords();
-        renderDashboard();
-        renderRecordsTable();
-        populateLoanReceiptDropdown();
-        renderLookupQuickChips();
-      }
+      state.records = firestoreRecords;
+      saveLocalRecords();
+      renderDashboard();
+      renderRecordsTable();
+      populateLoanReceiptDropdown();
+      renderLookupQuickChips();
     }, (error) => {
       console.error("Firestore snapshot error:", error);
-      showToast("Firestore query error. Using cached records.", "warning");
+      const statusDot = document.getElementById("firebase-status-dot");
+      const statusText = document.getElementById("firebase-status-text");
+      if (statusDot) statusDot.classList.add("offline");
+      if (statusText) statusText.textContent = "Sync error";
+      showToast("Firestore sync failed. Check the database rules and connection.", "error");
     });
   } catch (e) {
-    console.warn("Error setting up snapshot listener:", e);
+    console.error("Error setting up Firestore listener:", e);
+    showToast("Could not start Firestore sync: " + e.message, "error");
   }
 }
 
@@ -809,7 +816,7 @@ async function handleFormSubmit(e) {
       renderRecordsTable();
       populateLoanReceiptDropdown();
       renderLookupQuickChips();
-      showToast(`Record ${receiptId} saved locally`, "success");
+      showToast(`Record ${receiptId} saved on this device only. Configure Firebase to share it across devices.`, "info");
     }
 
     // Reset Form & Photo Preview
